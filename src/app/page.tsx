@@ -1,103 +1,195 @@
-import Image from "next/image";
+"use client";
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+// You'll need to install these dependencies:
+// npm install @splinetool/react-spline @splinetool/runtime lucide-react
+import Spline from "@splinetool/react-spline";
+import {
+  ChevronRight,
+  Zap,
+  Brain,
+  Heart,
+  Clock,
+  BookOpen,
+  Sparkles,
+} from "lucide-react";
+import router from "next/router";
 
-export default function Home() {
+const LatentLandingComplete: React.FC = () => {
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [scrollY, setScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePosition({ x: e.clientX, y: e.clientY });
+    };
+
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("scroll", handleScroll);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+  const avatars = [
+    {
+      name: "ARIA",
+      gender: "female",
+      personality: "Empathetic & Intuitive",
+      specialty: "Emotional Intelligence",
+      description:
+        "ARIA reads between the lines, understanding your emotions and providing supportive guidance.",
+      icon: <Heart className="w-6 h-6" />,
+    },
+    {
+      name: "NEXUS",
+      gender: "male",
+      personality: "Analytical & Precise",
+      specialty: "Problem Solving",
+      description:
+        "NEXUS processes complex information instantly, breaking down challenges into actionable steps.",
+      icon: <Brain className="w-6 h-6" />,
+    },
+    {
+      name: "LUNA",
+      gender: "female",
+      personality: "Creative & Inspiring",
+      specialty: "Learning & Growth",
+      description:
+        "LUNA sparks creativity and curiosity, making learning an engaging journey of discovery.",
+      icon: <Sparkles className="w-6 h-6" />,
+    },
+    {
+      name: "ATLAS",
+      gender: "male",
+      personality: "Focused & Disciplined",
+      specialty: "Productivity",
+      description:
+        "ATLAS helps you stay on track with time management and goal achievement strategies.",
+      icon: <Zap className="w-6 h-6" />,
+    },
+  ];
+  const router = useRouter();
+  const features = [
+    {
+      icon: <Heart className="w-8 h-8" />,
+      title: "Emotional Intelligence",
+      description:
+        "AI that understands and responds to your emotional state with genuine empathy",
+    },
+    {
+      icon: <Clock className="w-8 h-8" />,
+      title: "Smart Timers",
+      description:
+        "Adaptive time management that learns your productivity patterns and optimizes focus sessions",
+    },
+    {
+      icon: <BookOpen className="w-8 h-8" />,
+      title: "Study Mode",
+      description:
+        "Personalized learning companion that adapts to your learning style and pace",
+    },
+    {
+      icon: <Brain className="w-8 h-8" />,
+      title: "Advanced Conversations",
+      description:
+        "Deep, meaningful dialogues that evolve with your needs and preferences",
+    },
+  ];
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <>
+      {/* Embedded Styles */}
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+      <div className="latent-container">
+        {/* Fixed Navigation */}
+        <nav className="dark-header">
+          <div className="dark-logo">
+            <span className="logo-text">LATENT</span>
+          </div>
+          <div className="dark-nav">
+            <a href="#features" className="dark-nav-link">
+              Features
+            </a>
+            <a href="#avatars" className="dark-nav-link">
+              Avatars
+            </a>
+            <a href="#about" className="dark-nav-link">
+              About
+            </a>
+          </div>
+        </nav>
+
+        {/* Hero Section with Spline Integration */}
+        <section
+          className="hero-section"
+          style={{ transform: `translateY(${scrollY * 0.5}px)` }}
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <div className="hero-content">
+            <div className="hero-left">
+              <h1 className="hero-title">
+                THE FUTURE OF
+                <span className="hero-accent"> AI CONVERSATION</span>
+              </h1>
+              <p className="hero-description">
+                Experience next-generation AI avatars that don't just talk—they
+                understand, feel, and evolve with you. Welcome to LATENT, where
+                artificial intelligence meets authentic connection.
+              </p>
+              <div className="hero-buttons">
+                <button
+                  className="btn-primary"
+                  onClick={() => router.push("/avatars")}
+                >
+                  <span>OPEN CHAT</span>
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+                <button className="btn-secondary">
+                  <span>DISCOVER MORE</span>
+                </button>
+              </div>
+              <div className="hero-stats">
+                <div className="stat">
+                  <span className="stat-number">4</span>
+                  <span className="stat-label">Unique Avatars</span>
+                </div>
+                <div className="stat">
+                  <span className="stat-number">∞</span>
+                  <span className="stat-label">Conversations</span>
+                </div>
+                <div className="stat">
+                  <span className="stat-number">24/7</span>
+                  <span className="stat-label">Available</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="hero-right">
+              <div className="spline-container">
+                <Spline
+                  scene="https://prod.spline.design/NbVmy6DPLhY-5Lvg/scene.splinecode"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    position: "relative",
+                    overflow: "visible",
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="mouse-follower" style={{}} />
+      </div>
+    </>
   );
-}
+};
+
+export default LatentLandingComplete;
