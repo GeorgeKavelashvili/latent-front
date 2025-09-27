@@ -1,6 +1,15 @@
 // "use client";
 // import { useState, useEffect, useRef } from "react";
-// import { User, Send, Video, Mic, Settings, ArrowLeft } from "lucide-react";
+// import {
+//   User,
+//   Send,
+//   Video,
+//   Mic,
+//   Settings,
+//   ArrowLeft,
+//   Sparkles,
+//   Image as ImageIcon,
+// } from "lucide-react";
 // import { useRouter } from "next/navigation";
 
 // // Extend Window interface for TalkingHead
@@ -15,6 +24,7 @@
 //   const [message, setMessage] = useState("");
 //   const [messages, setMessages] = useState([]);
 //   const [isLoading, setIsLoading] = useState(false);
+//   const [isGenerating, setIsGenerating] = useState(false);
 //   const [avatarLoaded, setAvatarLoaded] = useState(false);
 //   const [avatarError, setAvatarError] = useState(null);
 //   const [selectedAvatar, setSelectedAvatar] = useState(null);
@@ -245,8 +255,9 @@
 //     }
 //   };
 
+//   // Handle regular send message (text only)
 //   const handleSendMessage = async () => {
-//     if (message.trim() && !isLoading) {
+//     if (message.trim() && !isLoading && !isGenerating) {
 //       const userMessage = message.trim();
 //       setIsLoading(true);
 
@@ -305,6 +316,113 @@
 //         );
 //       } finally {
 //         setIsLoading(false);
+//       }
+//     }
+//   };
+
+//   // Handle generate (text + image)
+//   const handleGenerateMessage = async () => {
+//     if (message.trim() && !isLoading && !isGenerating) {
+//       const userMessage = message.trim();
+//       setIsGenerating(true);
+
+//       // Add user message to chat
+//       setMessages((prevMessages) => [
+//         ...prevMessages,
+//         { text: userMessage, type: "user" },
+//       ]);
+//       setMessage("");
+
+//       // Add loading message
+//       const loadingMessage = { text: "AI is generating...", type: "loading" };
+//       setMessages((prevMessages) => [...prevMessages, loadingMessage]);
+
+//       try {
+//         // First, get text description from chat/send
+//         const textResponse = await fetch(
+//           "http://robot.nick.ge:8000/chat/send",
+//           {
+//             method: "POST",
+//             headers: {
+//               "Content-Type": "application/json",
+//             },
+//             body: JSON.stringify({
+//               message: userMessage,
+//               model: `${selectedAvatar}`,
+//             }),
+//           }
+//         );
+
+//         const textData = await textResponse.json();
+//         const modelText = textData.parts.map((p) => p.text).join("");
+
+//         // Remove loading message and add AI response with placeholder for image
+//         setMessages((prevMessages) =>
+//           prevMessages
+//             .filter((msg) => msg.type !== "loading")
+//             .concat([
+//               {
+//                 text: modelText,
+//                 type: "ai",
+//                 imageLoading: true, // Flag to show image is generating
+//               },
+//             ])
+//         );
+
+//         // Play audio with lip-sync if available
+//         if (textData.audio && modelText) {
+//           playAudioWithLipSync(textData.audio, textData.lipsync, modelText);
+//         }
+
+//         // Generate image using the AI's text description
+//         const imageResponse = await fetch(
+//           "http://robot.nick.ge:8000/chat/generate",
+//           {
+//             method: "POST",
+//             headers: {
+//               "Content-Type": "application/json",
+//             },
+//             body: JSON.stringify({
+//               text: modelText,
+//               model: `${selectedAvatar}`,
+//             }),
+//           }
+//         );
+
+//         const imageData = await imageResponse.json();
+
+//         if (imageData.ok && imageData.image) {
+//           // Update the last AI message with the generated image
+//           setMessages((prevMessages) => {
+//             const newMessages = [...prevMessages];
+//             const lastAiMessageIndex = newMessages.findLastIndex(
+//               (msg) => msg.type === "ai"
+//             );
+//             if (lastAiMessageIndex !== -1) {
+//               newMessages[lastAiMessageIndex] = {
+//                 ...newMessages[lastAiMessageIndex],
+//                 image: `data:${imageData.image.mimetype};base64,${imageData.image.data}`,
+//                 imageLoading: false,
+//               };
+//             }
+//             return newMessages;
+//           });
+//         }
+//       } catch (error) {
+//         console.error("Error generating content:", error);
+//         // Remove loading message and add error message
+//         setMessages((prevMessages) =>
+//           prevMessages
+//             .filter((msg) => msg.type !== "loading")
+//             .concat([
+//               {
+//                 text: "Sorry, there was an error generating content.",
+//                 type: "ai",
+//               },
+//             ])
+//         );
+//       } finally {
+//         setIsGenerating(false);
 //       }
 //     }
 //   };
@@ -529,19 +647,47 @@
 //     padding: "12px 16px",
 //     borderRadius: "12px",
 //     border: "none",
-//     cursor: message.trim() && !isLoading ? "pointer" : "not-allowed",
+//     cursor:
+//       message.trim() && !isLoading && !isGenerating ? "pointer" : "not-allowed",
 //     transition: "all 0.2s ease",
 //     display: "flex",
 //     alignItems: "center",
 //     justifyContent: "center",
 //     minWidth: "50px",
-//     ...(message.trim() && !isLoading
+//     ...(message.trim() && !isLoading && !isGenerating
 //       ? {
 //           background:
 //             "linear-gradient(135deg, rgba(6, 182, 212, 0.3), rgba(16, 185, 129, 0.3))",
 //           color: "#67E8F9",
 //           border: "1px solid rgba(6, 182, 212, 0.4)",
 //           boxShadow: "0 4px 16px rgba(6, 182, 212, 0.25)",
+//         }
+//       : {
+//           color: "rgba(255, 255, 255, 0.4)",
+//           background: "rgba(255, 255, 255, 0.05)",
+//           border: "1px solid rgba(255, 255, 255, 0.1)",
+//         }),
+//   };
+
+//   const generateButtonStyle = {
+//     padding: "12px 16px",
+//     borderRadius: "12px",
+//     border: "none",
+//     cursor:
+//       message.trim() && !isLoading && !isGenerating ? "pointer" : "not-allowed",
+//     transition: "all 0.2s ease",
+//     display: "flex",
+//     alignItems: "center",
+//     justifyContent: "center",
+//     gap: "8px",
+//     minWidth: "110px",
+//     ...(message.trim() && !isLoading && !isGenerating
+//       ? {
+//           background:
+//             "linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(236, 72, 153, 0.3))",
+//           color: "#E9D5FF",
+//           border: "1px solid rgba(168, 85, 247, 0.4)",
+//           boxShadow: "0 4px 16px rgba(168, 85, 247, 0.25)",
 //         }
 //       : {
 //           color: "rgba(255, 255, 255, 0.4)",
@@ -636,6 +782,31 @@
 //     transition: "all 0.2s ease",
 //   };
 
+//   const imageContainerStyle = {
+//     marginTop: "16px",
+//     borderRadius: "12px",
+//     overflow: "hidden",
+//     border: "1px solid rgba(255, 255, 255, 0.1)",
+//     background: "rgba(0, 0, 0, 0.3)",
+//   };
+
+//   const generatedImageStyle = {
+//     width: "100%",
+//     height: "auto",
+//     display: "block",
+//   };
+
+//   const imageLoadingStyle = {
+//     padding: "40px",
+//     textAlign: "center",
+//     color: "rgba(168, 85, 247, 0.7)",
+//     fontSize: "14px",
+//     display: "flex",
+//     flexDirection: "column",
+//     alignItems: "center",
+//     gap: "12px",
+//   };
+
 //   if (!selectedAvatar) {
 //     return (
 //       <div style={containerStyle}>
@@ -660,6 +831,19 @@
 //         @keyframes pulse {
 //           0%, 100% { opacity: 1; }
 //           50% { opacity: 0.5; }
+//         }
+
+//         @keyframes spin {
+//           to { transform: rotate(360deg); }
+//         }
+
+//         .spinner {
+//           width: 24px;
+//           height: 24px;
+//           border: 2px solid rgba(168, 85, 247, 0.3);
+//           border-top-color: rgba(168, 85, 247, 0.8);
+//           border-radius: 50%;
+//           animation: spin 1s linear infinite;
 //         }
 
 //         button:hover {
@@ -791,7 +975,8 @@
 //                     }}
 //                   >
 //                     Start a conversation with {avatarName} and watch them come
-//                     to life with lip-synchronized speech!
+//                     to life with lip-synchronized speech! Use "Generate" to
+//                     create images too!
 //                   </p>
 //                 </div>
 //               </div>
@@ -903,6 +1088,26 @@
 //                             >
 //                               {msg.text}
 //                             </p>
+
+//                             {/* Image container */}
+//                             {msg.imageLoading && (
+//                               <div style={imageContainerStyle}>
+//                                 <div style={imageLoadingStyle}>
+//                                   <div className="spinner"></div>
+//                                   <span>Generating image...</span>
+//                                 </div>
+//                               </div>
+//                             )}
+
+//                             {msg.image && (
+//                               <div style={imageContainerStyle}>
+//                                 <img
+//                                   src={msg.image}
+//                                   alt="Generated content"
+//                                   style={generatedImageStyle}
+//                                 />
+//                               </div>
+//                             )}
 //                           </div>
 //                           <div
 //                             style={{
@@ -913,6 +1118,12 @@
 //                               gap: "8px",
 //                             }}
 //                           >
+//                             {msg.image && (
+//                               <ImageIcon
+//                                 size={14}
+//                                 style={{ color: "rgba(168, 85, 247, 0.5)" }}
+//                               />
+//                             )}
 //                             <span
 //                               style={{
 //                                 color: "rgba(255, 255, 255, 0.3)",
@@ -941,11 +1152,22 @@
 //                 placeholder="Type your message..."
 //                 style={inputFieldStyle}
 //                 rows={1}
-//                 disabled={isLoading}
+//                 disabled={isLoading || isGenerating}
 //               />
 //               <button
+//                 onClick={handleGenerateMessage}
+//                 disabled={!message.trim() || isLoading || isGenerating}
+//                 style={generateButtonStyle}
+//                 title="Generate text and image"
+//               >
+//                 <Sparkles size={20} style={{ strokeWidth: "1.5px" }} />
+//                 <span style={{ fontSize: "14px", fontWeight: "500" }}>
+//                   {isGenerating ? "..." : "Generate"}
+//                 </span>
+//               </button>
+//               <button
 //                 onClick={handleSendMessage}
-//                 disabled={!message.trim() || isLoading}
+//                 disabled={!message.trim() || isLoading || isGenerating}
 //                 style={sendButtonStyle}
 //                 title="Send message"
 //               >
@@ -1061,7 +1283,18 @@ export default function AvatarChat() {
   const [avatarName, setAvatarName] = useState("");
   const avatarRef = useRef(null);
   const headRef = useRef(null);
+  const messagesEndRef = useRef(null);
   const router = useRouter();
+
+  // Scroll to bottom function
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   // Get selected avatar from localStorage on mount
   useEffect(() => {
@@ -2168,6 +2401,7 @@ export default function AvatarChat() {
                     )}
                   </div>
                 ))}
+                <div ref={messagesEndRef} />
               </div>
             )}
           </div>
