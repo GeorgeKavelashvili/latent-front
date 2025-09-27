@@ -1037,8 +1037,8 @@ import {
   Mic,
   Settings,
   ArrowLeft,
-  Image,
   Sparkles,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -1054,7 +1054,7 @@ export default function AvatarChat() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [avatarLoaded, setAvatarLoaded] = useState(false);
   const [avatarError, setAvatarError] = useState(null);
   const [selectedAvatar, setSelectedAvatar] = useState(null);
@@ -1285,76 +1285,9 @@ export default function AvatarChat() {
     }
   };
 
-  const handleGenerateImage = async () => {
-    if (!message.trim() || isGeneratingImage || isLoading) return;
-
-    const prompt = message.trim();
-    setIsGeneratingImage(true);
-
-    // Add user request to chat
-    setMessages((prevMessages) => [
-      ...prevMessages,
-      { text: `Generate image: ${prompt}`, type: "user" },
-    ]);
-    setMessage("");
-
-    // Add loading message for image generation
-    const loadingMessage = {
-      text: "Generating beautiful SVG image...",
-      type: "image-loading",
-    };
-    setMessages((prevMessages) => [...prevMessages, loadingMessage]);
-
-    try {
-      const response = await fetch("http://robot.nick.ge:8000/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          query: prompt,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.svg) {
-        // Remove loading message and add generated image
-        setMessages((prevMessages) =>
-          prevMessages
-            .filter((msg) => msg.type !== "image-loading")
-            .concat([
-              {
-                text: `Here's your generated image for: "${prompt}"`,
-                type: "ai-image",
-                svg: data.svg,
-                prompt: prompt,
-              },
-            ])
-        );
-      } else {
-        throw new Error("No SVG data received");
-      }
-    } catch (error) {
-      console.error("Error generating image:", error);
-      // Remove loading message and add error message
-      setMessages((prevMessages) =>
-        prevMessages
-          .filter((msg) => msg.type !== "image-loading")
-          .concat([
-            {
-              text: "Sorry, there was an error generating the image. Please try again.",
-              type: "ai",
-            },
-          ])
-      );
-    } finally {
-      setIsGeneratingImage(false);
-    }
-  };
-
+  // Handle regular send message (text only)
   const handleSendMessage = async () => {
-    if (message.trim() && !isLoading) {
+    if (message.trim() && !isLoading && !isGenerating) {
       const userMessage = message.trim();
       setIsLoading(true);
 
@@ -1413,6 +1346,113 @@ export default function AvatarChat() {
         );
       } finally {
         setIsLoading(false);
+      }
+    }
+  };
+
+  // Handle generate (text + image)
+  const handleGenerateMessage = async () => {
+    if (message.trim() && !isLoading && !isGenerating) {
+      const userMessage = message.trim();
+      setIsGenerating(true);
+
+      // Add user message to chat
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        { text: userMessage, type: "user" },
+      ]);
+      setMessage("");
+
+      // Add loading message
+      const loadingMessage = { text: "AI is generating...", type: "loading" };
+      setMessages((prevMessages) => [...prevMessages, loadingMessage]);
+
+      try {
+        // First, get text description from chat/send
+        const textResponse = await fetch(
+          "http://robot.nick.ge:8000/chat/send",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              message: userMessage,
+              model: `${selectedAvatar}`,
+            }),
+          }
+        );
+
+        const textData = await textResponse.json();
+        const modelText = textData.parts.map((p) => p.text).join("");
+
+        // Remove loading message and add AI response with placeholder for image
+        setMessages((prevMessages) =>
+          prevMessages
+            .filter((msg) => msg.type !== "loading")
+            .concat([
+              {
+                text: modelText,
+                type: "ai",
+                imageLoading: true, // Flag to show image is generating
+              },
+            ])
+        );
+
+        // Play audio with lip-sync if available
+        if (textData.audio && modelText) {
+          playAudioWithLipSync(textData.audio, textData.lipsync, modelText);
+        }
+
+        // Generate image using the AI's text description
+        const imageResponse = await fetch(
+          "http://robot.nick.ge:8000/chat/generate",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: modelText,
+              model: `${selectedAvatar}`,
+            }),
+          }
+        );
+
+        const imageData = await imageResponse.json();
+
+        if (imageData.ok && imageData.image) {
+          // Update the last AI message with the generated image
+          setMessages((prevMessages) => {
+            const newMessages = [...prevMessages];
+            const lastAiMessageIndex = newMessages.findLastIndex(
+              (msg) => msg.type === "ai"
+            );
+            if (lastAiMessageIndex !== -1) {
+              newMessages[lastAiMessageIndex] = {
+                ...newMessages[lastAiMessageIndex],
+                image: `data:${imageData.image.mimetype};base64,${imageData.image.data}`,
+                imageLoading: false,
+              };
+            }
+            return newMessages;
+          });
+        }
+      } catch (error) {
+        console.error("Error generating content:", error);
+        // Remove loading message and add error message
+        setMessages((prevMessages) =>
+          prevMessages
+            .filter((msg) => msg.type !== "loading")
+            .concat([
+              {
+                text: "Sorry, there was an error generating content.",
+                type: "ai",
+              },
+            ])
+        );
+      } finally {
+        setIsGenerating(false);
       }
     }
   };
@@ -1569,30 +1609,11 @@ export default function AvatarChat() {
     boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
   };
 
-  const aiImageMessageStyle = {
-    maxWidth: "500px",
-    background:
-      "linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(168, 85, 247, 0.15))",
-    backdropFilter: "blur(8px)",
-    border: "1px solid rgba(147, 51, 234, 0.25)",
-    borderRadius: "24px",
-    borderTopRightRadius: "8px",
-    padding: "20px",
-    boxShadow: "0 25px 50px -12px rgba(147, 51, 234, 0.25)",
-  };
-
   const loadingMessageStyle = {
     ...aiMessageStyle,
     background:
       "linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 193, 7, 0.15))",
     border: "1px solid rgba(255, 193, 7, 0.25)",
-  };
-
-  const imageLoadingMessageStyle = {
-    ...aiImageMessageStyle,
-    background:
-      "linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(168, 85, 247, 0.15))",
-    border: "1px solid rgba(168, 85, 247, 0.25)",
   };
 
   const aiHeaderStyle = {
@@ -1614,18 +1635,6 @@ export default function AvatarChat() {
     border: "1px solid rgba(6, 182, 212, 0.2)",
   };
 
-  const aiImageAvatarStyle = {
-    width: "28px",
-    height: "28px",
-    borderRadius: "50%",
-    background:
-      "linear-gradient(135deg, rgba(147, 51, 234, 0.3), rgba(168, 85, 247, 0.3))",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    border: "1px solid rgba(147, 51, 234, 0.2)",
-  };
-
   const aiIndicatorStyle = {
     width: "10px",
     height: "10px",
@@ -1633,20 +1642,6 @@ export default function AvatarChat() {
     borderRadius: "50%",
   };
 
-  const svgContainerStyle = {
-    marginTop: "16px",
-    borderRadius: "16px",
-    overflow: "hidden",
-    background: "rgba(255, 255, 255, 0.02)",
-    border: "1px solid rgba(255, 255, 255, 0.05)",
-    padding: "16px",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    minHeight: "200px",
-    maxHeight: "400px",
-    width: "100%",
-  };
   const inputContainerStyle = {
     borderTop: "1px solid rgba(255, 255, 255, 0.1)",
     backgroundColor: "rgba(0, 0, 0, 0.8)",
@@ -1682,13 +1677,14 @@ export default function AvatarChat() {
     padding: "12px 16px",
     borderRadius: "12px",
     border: "none",
-    cursor: message.trim() && !isLoading ? "pointer" : "not-allowed",
+    cursor:
+      message.trim() && !isLoading && !isGenerating ? "pointer" : "not-allowed",
     transition: "all 0.2s ease",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     minWidth: "50px",
-    ...(message.trim() && !isLoading
+    ...(message.trim() && !isLoading && !isGenerating
       ? {
           background:
             "linear-gradient(135deg, rgba(6, 182, 212, 0.3), rgba(16, 185, 129, 0.3))",
@@ -1703,26 +1699,25 @@ export default function AvatarChat() {
         }),
   };
 
-  const imageButtonStyle = {
+  const generateButtonStyle = {
     padding: "12px 16px",
     borderRadius: "12px",
     border: "none",
     cursor:
-      message.trim() && !isGeneratingImage && !isLoading
-        ? "pointer"
-        : "not-allowed",
+      message.trim() && !isLoading && !isGenerating ? "pointer" : "not-allowed",
     transition: "all 0.2s ease",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    minWidth: "50px",
-    ...(message.trim() && !isGeneratingImage && !isLoading
+    gap: "8px",
+    minWidth: "110px",
+    ...(message.trim() && !isLoading && !isGenerating
       ? {
           background:
-            "linear-gradient(135deg, rgba(147, 51, 234, 0.3), rgba(168, 85, 247, 0.3))",
-          color: "#A855F7",
-          border: "1px solid rgba(147, 51, 234, 0.4)",
-          boxShadow: "0 4px 16px rgba(147, 51, 234, 0.25)",
+            "linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(236, 72, 153, 0.3))",
+          color: "#E9D5FF",
+          border: "1px solid rgba(168, 85, 247, 0.4)",
+          boxShadow: "0 4px 16px rgba(168, 85, 247, 0.25)",
         }
       : {
           color: "rgba(255, 255, 255, 0.4)",
@@ -1817,6 +1812,31 @@ export default function AvatarChat() {
     transition: "all 0.2s ease",
   };
 
+  const imageContainerStyle = {
+    marginTop: "16px",
+    borderRadius: "12px",
+    overflow: "hidden",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    background: "rgba(0, 0, 0, 0.3)",
+  };
+
+  const generatedImageStyle = {
+    width: "100%",
+    height: "auto",
+    display: "block",
+  };
+
+  const imageLoadingStyle = {
+    padding: "40px",
+    textAlign: "center",
+    color: "rgba(168, 85, 247, 0.7)",
+    fontSize: "14px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "12px",
+  };
+
   if (!selectedAvatar) {
     return (
       <div style={containerStyle}>
@@ -1843,9 +1863,17 @@ export default function AvatarChat() {
           50% { opacity: 0.5; }
         }
 
-        @keyframes sparkle {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(1.1); }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        .spinner {
+          width: 24px;
+          height: 24px;
+          border: 2px solid rgba(168, 85, 247, 0.3);
+          border-top-color: rgba(168, 85, 247, 0.8);
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
         }
 
         button:hover {
@@ -1889,23 +1917,6 @@ export default function AvatarChat() {
 
         .typing-indicator {
           animation: typing 1.5s infinite;
-        }
-
-        .sparkle-animation {
-          animation: sparkle 2s infinite ease-in-out;
-        }
-
-        .svg-content {
-          max-width: 100%;
-          height: auto;
-          filter: drop-shadow(0 4px 20px rgba(147, 51, 234, 0.3));
-        }
-
-       .svg-content svg {
-         max-width: 100%;
-         max-height: 350px;
-         height: auto;
-         width: auto;
         }
       `}</style>
 
@@ -1994,8 +2005,8 @@ export default function AvatarChat() {
                     }}
                   >
                     Start a conversation with {avatarName} and watch them come
-                    to life with lip-synchronized speech! You can also generate
-                    beautiful SVG images.
+                    to life with lip-synchronized speech! Use "Generate" to
+                    create images too!
                   </p>
                 </div>
               </div>
@@ -2078,115 +2089,6 @@ export default function AvatarChat() {
                           </div>
                         </div>
                       </div>
-                    ) : msg.type === "image-loading" ? (
-                      // Image loading message
-                      <div style={aiMessageContainerStyle}>
-                        <div style={{ maxWidth: "500px" }}>
-                          <div style={imageLoadingMessageStyle}>
-                            <div style={aiHeaderStyle}>
-                              <div style={aiImageAvatarStyle}>
-                                <Sparkles
-                                  size={14}
-                                  style={{
-                                    color: "#A855F7",
-                                  }}
-                                  className="sparkle-animation"
-                                />
-                              </div>
-                              <span
-                                style={{
-                                  color: "#A855F7",
-                                  fontSize: "14px",
-                                  fontWeight: "600",
-                                }}
-                              >
-                                AI Artist
-                              </span>
-                            </div>
-                            <p
-                              style={{
-                                color: "rgba(255, 255, 255, 0.85)",
-                                fontSize: "16px",
-                                lineHeight: "1.5",
-                                margin: 0,
-                              }}
-                              className="typing-indicator"
-                            >
-                              {msg.text}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ) : msg.type === "ai-image" ? (
-                      // AI image message on RIGHT
-                      <div style={aiMessageContainerStyle}>
-                        <div style={{ maxWidth: "500px" }}>
-                          <div style={aiImageMessageStyle}>
-                            <div style={aiHeaderStyle}>
-                              <div style={aiImageAvatarStyle}>
-                                <Image
-                                  size={14}
-                                  style={{
-                                    color: "#A855F7",
-                                  }}
-                                />
-                              </div>
-                              <span
-                                style={{
-                                  color: "#A855F7",
-                                  fontSize: "14px",
-                                  fontWeight: "600",
-                                }}
-                              >
-                                AI Artist
-                              </span>
-                            </div>
-                            <p
-                              style={{
-                                color: "rgba(255, 255, 255, 0.85)",
-                                fontSize: "16px",
-                                lineHeight: "1.5",
-                                margin: 0,
-                              }}
-                            >
-                              {msg.text}
-                            </p>
-                            {msg.svg && (
-                              <div style={svgContainerStyle}>
-                                <div
-                                  dangerouslySetInnerHTML={{ __html: msg.svg }}
-                                  className="svg-content"
-                                  style={{
-                                    width: "100%",
-                                    height: "100%",
-                                    display: "flex",
-                                    justifyContent: "center",
-                                    alignItems: "center",
-                                  }}
-                                />
-                              </div>
-                            )}
-                          </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "flex-end",
-                              marginTop: "8px",
-                              gap: "8px",
-                            }}
-                          >
-                            <span
-                              style={{
-                                color: "rgba(255, 255, 255, 0.3)",
-                                fontSize: "12px",
-                              }}
-                            >
-                              Just now
-                            </span>
-                          </div>
-                        </div>
-                      </div>
                     ) : (
                       // AI message on RIGHT
                       <div style={aiMessageContainerStyle}>
@@ -2216,6 +2118,26 @@ export default function AvatarChat() {
                             >
                               {msg.text}
                             </p>
+
+                            {/* Image container */}
+                            {msg.imageLoading && (
+                              <div style={imageContainerStyle}>
+                                <div style={imageLoadingStyle}>
+                                  <div className="spinner"></div>
+                                  <span>Generating image...</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {msg.image && (
+                              <div style={imageContainerStyle}>
+                                <img
+                                  src={msg.image}
+                                  alt="Generated content"
+                                  style={generatedImageStyle}
+                                />
+                              </div>
+                            )}
                           </div>
                           <div
                             style={{
@@ -2226,6 +2148,12 @@ export default function AvatarChat() {
                               gap: "8px",
                             }}
                           >
+                            {msg.image && (
+                              <ImageIcon
+                                size={14}
+                                style={{ color: "rgba(168, 85, 247, 0.5)" }}
+                              />
+                            )}
                             <span
                               style={{
                                 color: "rgba(255, 255, 255, 0.3)",
@@ -2251,22 +2179,25 @@ export default function AvatarChat() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Type your message or image prompt..."
+                placeholder="Type your message..."
                 style={inputFieldStyle}
                 rows={1}
-                disabled={isLoading || isGeneratingImage}
+                disabled={isLoading || isGenerating}
               />
               <button
-                onClick={handleGenerateImage}
-                disabled={!message.trim() || isGeneratingImage || isLoading}
-                style={imageButtonStyle}
-                title="Generate SVG Image"
+                onClick={handleGenerateMessage}
+                disabled={!message.trim() || isLoading || isGenerating}
+                style={generateButtonStyle}
+                title="Generate text and image"
               >
                 <Sparkles size={20} style={{ strokeWidth: "1.5px" }} />
+                <span style={{ fontSize: "14px", fontWeight: "500" }}>
+                  {isGenerating ? "..." : "Generate"}
+                </span>
               </button>
               <button
                 onClick={handleSendMessage}
-                disabled={!message.trim() || isLoading}
+                disabled={!message.trim() || isLoading || isGenerating}
                 style={sendButtonStyle}
                 title="Send message"
               >
