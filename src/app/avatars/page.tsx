@@ -5,14 +5,22 @@ import { useRouter } from "next/navigation";
 import { User, ArrowRight, Loader } from "lucide-react";
 
 interface Avatar {
-  filename: string;
+  gender: string;
+  model: string;
+  model_path: string;
+  model_url: string;
   name: string;
-  thumbnail?: string;
+  sysprompt: string;
+  thumbnail: string;
+  thumbnail_path: string;
+  thumbnail_url: string;
+  voice_id: string;
 }
 
 export default function AvatarsPage() {
   const [avatars, setAvatars] = useState<Avatar[]>([]);
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -30,16 +38,16 @@ export default function AvatarsPage() {
         throw new Error("Failed to fetch avatars");
       }
 
-      const avatarFiles: string[] = await response.json();
+      const data = await response.json();
 
-      // Transform filenames into avatar objects with proper names and thumbnails
-      const avatarList: Avatar[] = avatarFiles.map((filename) => ({
-        filename,
-        name: formatAvatarName(filename),
-        thumbnail: `http://robot.nick.ge:8000/avatar/thumbnail?f=${filename}`,
-      }));
+      // The response now has an "avatars" array
+      setAvatars(data.avatars);
 
-      setAvatars(avatarList);
+      // Start from middle avatar without selecting it
+      if (data.avatars.length > 0) {
+        const middleIndex = Math.floor(data.avatars.length / 2);
+        setCurrentIndex(middleIndex);
+      }
     } catch (err) {
       setError("Failed to load avatars. Please try again.");
       console.error("Error fetching avatars:", err);
@@ -48,28 +56,38 @@ export default function AvatarsPage() {
     }
   };
 
-  const formatAvatarName = (filename: string): string => {
-    // Remove .glb extension and format name
-    const name = filename.replace(".glb", "");
-    return name
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
-  };
-
-  const handleAvatarSelect = (filename: string) => {
-    setSelectedAvatar(filename);
+  const handleAvatarSelect = (model: string) => {
+    setSelectedAvatar(model);
+    // Update current index to match selected avatar
+    const index = avatars.findIndex((a) => a.model === model);
+    setCurrentIndex(index);
   };
 
   const handleOpenChat = () => {
     if (selectedAvatar) {
-      // Store selected avatar in localStorage
+      // Store selected avatar model in localStorage
       localStorage.setItem("selectedAvatar", selectedAvatar);
       router.push("/chat");
     }
   };
 
-  // Inline styles matching chat page design
+  const handlePrevious = () => {
+    if (!avatars.length) return;
+    const prevIndex =
+      currentIndex === 0 ? avatars.length - 1 : currentIndex - 1;
+    setCurrentIndex(prevIndex);
+    // Don't auto-select, keep previous selection
+  };
+
+  const handleNext = () => {
+    if (!avatars.length) return;
+    const nextIndex =
+      currentIndex === avatars.length - 1 ? 0 : currentIndex + 1;
+    setCurrentIndex(nextIndex);
+    // Don't auto-select, keep previous selection
+  };
+
+  // Inline styles
   const containerStyle = {
     minHeight: "100vh",
     backgroundColor: "#000000",
@@ -78,11 +96,15 @@ export default function AvatarsPage() {
     padding: "2rem",
     fontFamily:
       '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
   };
 
   const headerStyle = {
     textAlign: "center",
-    marginBottom: "3rem",
+    marginBottom: "2rem",
+    zIndex: 20,
   };
 
   const titleStyle = {
@@ -96,6 +118,7 @@ export default function AvatarsPage() {
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
     backgroundClip: "text",
+    margin: 0,
   };
 
   const subtitleStyle = {
@@ -104,32 +127,56 @@ export default function AvatarsPage() {
     margin: 0,
   };
 
-  const avatarGridStyle = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-    gap: "2rem",
-    maxWidth: "1200px",
-    margin: "0 auto",
-    flex: 1,
+  const avatarContainerStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "70vh",
+    position: "relative",
+    overflow: "hidden",
+    maxWidth: "100vw",
+    padding: "0 4rem",
   };
 
-  const avatarCardStyle = (isSelected) => ({
+  const avatarCarouselStyle = {
+    display: "flex",
+    gap: "2rem",
+    transition: "transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+    transform: `translateX(calc(50% - ${currentIndex * 320 + 150}px))`,
+  };
+
+  const avatarCardWrapperStyle = (isCenter) => ({
+    minWidth: "300px",
+    transform: isCenter ? "scale(1.1)" : "scale(0.85)",
+    opacity: isCenter ? 1 : 0.6,
+    transition: "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+    zIndex: isCenter ? 10 : 1,
+  });
+
+  const avatarCardStyle = (isSelected, isCenter) => ({
     background: isSelected
-      ? "linear-gradient(135deg, rgba(0, 255, 209, 0.15), rgba(34, 211, 238, 0.15))"
-      : "linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02))",
-    backdropFilter: "blur(8px)",
+      ? "linear-gradient(135deg, rgba(0, 255, 209, 0.1), rgba(34, 211, 238, 0.1))"
+      : isCenter
+      ? "linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04))"
+      : "linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01))",
+    backdropFilter: "blur(12px)",
     border: isSelected
-      ? "2px solid rgba(0, 255, 209, 0.5)"
-      : "1px solid rgba(255, 255, 255, 0.1)",
-    borderRadius: "20px",
-    padding: "1.5rem",
+      ? "2px solid rgba(0, 255, 209, 0.4)"
+      : isCenter
+      ? "1px solid rgba(255, 255, 255, 0.15)"
+      : "1px solid rgba(255, 255, 255, 0.05)",
+    borderRadius: "24px",
+    padding: "2rem",
     cursor: "pointer",
-    transition: "all 0.3s ease",
+    transition: "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
     position: "relative",
     overflow: "hidden",
     boxShadow: isSelected
-      ? "0 25px 50px -12px rgba(0, 255, 209, 0.25)"
-      : "0 10px 30px rgba(0, 0, 0, 0.3)",
+      ? "0 25px 50px -12px rgba(0, 255, 209, 0.2)"
+      : isCenter
+      ? "0 20px 40px rgba(0, 0, 0, 0.4)"
+      : "0 10px 20px rgba(0, 0, 0, 0.2)",
+    height: "400px",
   });
 
   const thumbnailContainerStyle = {
@@ -151,17 +198,6 @@ export default function AvatarsPage() {
     transition: "transform 0.3s ease",
   };
 
-  const placeholderThumbnailStyle = {
-    width: "100%",
-    height: "100%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background:
-      "linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05))",
-    color: "rgba(255, 255, 255, 0.4)",
-  };
-
   const overlayStyle = (isSelected) => ({
     position: "absolute",
     top: 0,
@@ -169,7 +205,7 @@ export default function AvatarsPage() {
     right: 0,
     bottom: 0,
     background:
-      "linear-gradient(135deg, rgba(0, 255, 209, 0.8), rgba(34, 211, 238, 0.8))",
+      "linear-gradient(135deg, rgba(0, 255, 209, 0.6), rgba(34, 211, 238, 0.6))",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -202,10 +238,65 @@ export default function AvatarsPage() {
     letterSpacing: "1px",
   };
 
-  const footerStyle = {
+  const indicatorContainerStyle = {
+    position: "absolute",
+    bottom: "2rem",
+    left: "50%",
+    transform: "translateX(-50%)",
     display: "flex",
+    gap: "0.5rem",
+    zIndex: 20,
+  };
+
+  const indicatorStyle = (isActive) => ({
+    width: "12px",
+    height: "12px",
+    borderRadius: "50%",
+    background: isActive
+      ? "linear-gradient(135deg, rgba(0, 255, 209, 0.8), rgba(34, 211, 238, 0.8))"
+      : "rgba(255, 255, 255, 0.3)",
+    transition: "all 0.3s ease",
+    cursor: "pointer",
+    boxShadow: isActive ? "0 0 20px rgba(0, 255, 209, 0.5)" : "none",
+  });
+
+  const navButtonStyle = {
+    position: "absolute",
+    top: "50%",
+    transform: "translateY(-50%)",
+    width: "50px",
+    height: "50px",
+    borderRadius: "50%",
+    background:
+      "linear-gradient(135deg, rgba(0, 255, 209, 0.2), rgba(34, 211, 238, 0.2))",
+    backdropFilter: "blur(12px)",
+    border: "1px solid rgba(0, 255, 209, 0.3)",
+    color: "rgba(0, 255, 209, 0.8)",
+    cursor: "pointer",
+    transition: "all 0.3s ease",
+    display: "flex",
+    alignItems: "center",
     justifyContent: "center",
-    marginTop: "3rem",
+    zIndex: 100,
+    fontSize: "18px",
+    fontWeight: "bold",
+  };
+
+  const leftNavStyle = {
+    ...navButtonStyle,
+    left: "1rem",
+  };
+
+  const rightNavStyle = {
+    ...navButtonStyle,
+    right: "1rem",
+  };
+
+  const footerStyle = {
+    position: "fixed",
+    bottom: "2rem",
+    right: "2rem",
+    zIndex: 1000,
   };
 
   const openChatButtonStyle = (enabled) => ({
@@ -316,11 +407,20 @@ export default function AvatarsPage() {
         }
 
         button:hover {
-          transform: translateY(-2px);
+          transform: translateY(-2px) !important;
         }
 
         button:active {
-          transform: translateY(0);
+          transform: translateY(0) !important;
+        }
+
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+        }
+
+        .floating {
+          animation: float 3s ease-in-out infinite;
         }
       `}</style>
 
@@ -332,63 +432,97 @@ export default function AvatarsPage() {
           </p>
         </div>
 
-        <div style={avatarGridStyle}>
-          {avatars.map((avatar) => {
-            const isSelected = selectedAvatar === avatar.filename;
-            return (
-              <div
-                key={avatar.filename}
-                style={avatarCardStyle(isSelected)}
-                onClick={() => handleAvatarSelect(avatar.filename)}
-                onMouseEnter={(e) => {
-                  if (!isSelected) {
-                    e.target.style.transform = "translateY(-5px)";
-                    e.target.style.boxShadow =
-                      "0 15px 40px rgba(0, 255, 209, 0.2)";
-                    e.target.style.borderColor = "rgba(0, 255, 209, 0.3)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSelected) {
-                    e.target.style.transform = "translateY(0)";
-                    e.target.style.boxShadow = "0 10px 30px rgba(0, 0, 0, 0.3)";
-                    e.target.style.borderColor = "rgba(255, 255, 255, 0.1)";
-                  }
-                }}
-              >
-                <div style={thumbnailContainerStyle}>
-                  {avatar.thumbnail ? (
-                    <img
-                      src={avatar.thumbnail}
-                      alt={avatar.name}
-                      style={thumbnailStyle}
-                      onError={(e) => {
-                        e.target.style.display = "none";
-                        e.target.parentNode.innerHTML = `
-                          <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05)); color: rgba(255, 255, 255, 0.4);">
-                            <svg width="72" height="72" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                            </svg>
-                          </div>
-                        `;
-                      }}
-                    />
-                  ) : (
-                    <div style={placeholderThumbnailStyle}>
-                      <User size={72} />
+        <div style={avatarContainerStyle}>
+          {/* Left Navigation Button */}
+          <button
+            style={leftNavStyle}
+            onClick={handlePrevious}
+            onMouseEnter={(e) => {
+              e.target.style.background =
+                "linear-gradient(135deg, rgba(0, 255, 209, 0.3), rgba(34, 211, 238, 0.3))";
+              e.target.style.transform = "translateY(-50%) scale(1.1)";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background =
+                "linear-gradient(135deg, rgba(0, 255, 209, 0.2), rgba(34, 211, 238, 0.2))";
+              e.target.style.transform = "translateY(-50%) scale(1)";
+            }}
+          >
+            ‹
+          </button>
+
+          <div style={avatarCarouselStyle}>
+            {avatars.map((avatar, index) => {
+              const isSelected = selectedAvatar === avatar.model;
+              const isCenter = index === currentIndex;
+
+              return (
+                <div
+                  key={avatar.model}
+                  style={avatarCardWrapperStyle(isCenter)}
+                >
+                  <div
+                    style={avatarCardStyle(isSelected, isCenter)}
+                    onClick={() => handleAvatarSelect(avatar.model)}
+                  >
+                    <div style={thumbnailContainerStyle}>
+                      <img
+                        src={`http://robot.nick.ge:8000${avatar.thumbnail_url}`}
+                        alt={avatar.name}
+                        style={thumbnailStyle}
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                          e.target.parentNode.innerHTML = `
+                            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05)); color: rgba(255, 255, 255, 0.4);">
+                              <svg width="72" height="72" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                              </svg>
+                            </div>
+                          `;
+                        }}
+                      />
+                      <div style={overlayStyle(isSelected)}>
+                        <div style={selectIconStyle}>✓</div>
+                      </div>
                     </div>
-                  )}
-                  <div style={overlayStyle(isSelected)}>
-                    <div style={selectIconStyle}>✓</div>
+                    <div style={avatarInfoStyle}>
+                      <h3 style={avatarNameStyle}>{avatar.name}</h3>
+                      <p style={avatarTypeStyle}>AI Assistant</p>
+                    </div>
                   </div>
                 </div>
-                <div style={avatarInfoStyle}>
-                  <h3 style={avatarNameStyle}>{avatar.name}</h3>
-                  <p style={avatarTypeStyle}>AI Assistant</p>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+
+          {/* Right Navigation Button */}
+          <button
+            style={rightNavStyle}
+            onClick={handleNext}
+            onMouseEnter={(e) => {
+              e.target.style.background =
+                "linear-gradient(135deg, rgba(0, 255, 209, 0.3), rgba(34, 211, 238, 0.3))";
+              e.target.style.transform = "translateY(-50%) scale(1.1)";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background =
+                "linear-gradient(135deg, rgba(0, 255, 209, 0.2), rgba(34, 211, 238, 0.2))";
+              e.target.style.transform = "translateY(-50%) scale(1)";
+            }}
+          >
+            ›
+          </button>
+
+          {/* Navigation indicators */}
+          <div style={indicatorContainerStyle}>
+            {avatars.map((avatar, index) => (
+              <div
+                key={`indicator-${index}`}
+                style={indicatorStyle(selectedAvatar === avatar.model)}
+                onClick={() => handleAvatarSelect(avatar.model)}
+              />
+            ))}
+          </div>
         </div>
 
         <div style={footerStyle}>

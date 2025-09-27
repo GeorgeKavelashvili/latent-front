@@ -1,14 +1,254 @@
 // "use client";
-// import { useState } from "react";
-// import { User, Send, Video, Mic, Settings } from "lucide-react";
+// import { useState, useEffect, useRef } from "react";
+// import { User, Send, Video, Mic, Settings, ArrowLeft } from "lucide-react";
+// import { useRouter } from "next/navigation";
+
+// // Extend Window interface for TalkingHead
+// declare global {
+//   interface Window {
+//     TalkingHead: any;
+//     talkingHeadLoaded: boolean;
+//   }
+// }
 
 // export default function AvatarChat() {
 //   const [message, setMessage] = useState("");
 //   const [messages, setMessages] = useState([]);
+//   const [isLoading, setIsLoading] = useState(false);
+//   const [avatarLoaded, setAvatarLoaded] = useState(false);
+//   const [avatarError, setAvatarError] = useState(null);
+//   const [selectedAvatar, setSelectedAvatar] = useState(null);
+//   const [avatarName, setAvatarName] = useState("");
+//   const avatarRef = useRef(null);
+//   const headRef = useRef(null);
+//   const router = useRouter();
+
+//   // Get selected avatar from localStorage on mount
+//   useEffect(() => {
+//     const storedAvatar = localStorage.getItem("selectedAvatar");
+//     if (storedAvatar) {
+//       setSelectedAvatar(storedAvatar);
+//       // Format avatar name for display
+//       const name = storedAvatar
+//         .replace(".glb", "")
+//         .split("-")
+//         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+//         .join(" ");
+//       setAvatarName(name);
+//     } else {
+//       // If no avatar selected, redirect to avatar selection
+//       router.push("/avatars");
+//     }
+//   }, [router]);
+
+//   // Load scripts and initialize avatar
+//   useEffect(() => {
+//     if (!selectedAvatar) return;
+
+//     const initAvatar = async () => {
+//       try {
+//         // Check if TalkingHead is already loaded globally
+//         if (window.TalkingHead) {
+//           await initializeTalkingHead();
+//           return;
+//         }
+
+//         // Add import map if it doesn't exist
+//         if (!document.querySelector('script[type="importmap"]')) {
+//           const importMap = document.createElement("script");
+//           importMap.type = "importmap";
+//           importMap.textContent = JSON.stringify({
+//             imports: {
+//               three:
+//                 "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js/+esm",
+//               "three/addons/":
+//                 "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+//               talkinghead:
+//                 "https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.5/modules/talkinghead.mjs",
+//             },
+//           });
+//           document.head.appendChild(importMap);
+//         }
+
+//         // Load TalkingHead as a module script
+//         const script = document.createElement("script");
+//         script.type = "module";
+//         script.innerHTML = `
+//           import { TalkingHead } from "talkinghead";
+//           window.TalkingHead = TalkingHead;
+//           window.talkingHeadLoaded = true;
+//         `;
+
+//         document.head.appendChild(script);
+
+//         // Wait for the script to load
+//         const checkLoaded = () => {
+//           return new Promise((resolve) => {
+//             const interval = setInterval(() => {
+//               if (window.TalkingHead) {
+//                 clearInterval(interval);
+//                 resolve();
+//               }
+//             }, 100);
+//           });
+//         };
+
+//         await checkLoaded();
+//         await initializeTalkingHead();
+//       } catch (error) {
+//         console.error("Failed to load avatar:", error);
+//         setAvatarError("Failed to load avatar. Audio will still work.");
+//       }
+//     };
+
+//     const initializeTalkingHead = async () => {
+//       if (!avatarRef.current || !window.TalkingHead || !selectedAvatar) return;
+
+//       try {
+//         // Create TalkingHead instance
+//         const head = new window.TalkingHead(avatarRef.current, {
+//           ttsEndpoint: "/gtts/",
+//           ttsApikey: "dummy-key-not-used",
+//           lipsyncModules: ["en"],
+//           lipsyncLang: "en",
+//           pcmSampleRate: 22050,
+//           modelFPS: 120,
+//           cameraView: "upper",
+//           avatarMood: "neutral",
+//         });
+
+//         headRef.current = head;
+
+//         // Load the selected avatar dynamically
+//         await head.showAvatar({
+//           url: `http://robot.nick.ge:8000/avatar/get?f=${selectedAvatar}`,
+//           body:
+//             selectedAvatar.toLowerCase().includes("woman") ||
+//             selectedAvatar.toLowerCase().includes("girl")
+//               ? "F"
+//               : "M",
+//           avatarMood: "neutral",
+//           lipsyncLang: "en",
+//         });
+
+//         setAvatarLoaded(true);
+//         console.log(`Avatar loaded successfully: ${selectedAvatar}`);
+//       } catch (error) {
+//         console.error("Failed to initialize avatar:", error);
+//         setAvatarError("Failed to load selected avatar. Please try again.");
+//       }
+//     };
+
+//     initAvatar();
+
+//     // Cleanup function
+//     return () => {
+//       if (headRef.current) {
+//         headRef.current = null;
+//       }
+//     };
+//   }, [selectedAvatar]);
+
+//   // Convert base64 audio to AudioBuffer for lip-sync
+//   const base64ToAudioBuffer = async (base64Audio) => {
+//     try {
+//       const audioBytes = atob(base64Audio);
+//       const buffer = new Uint8Array(audioBytes.length);
+//       for (let i = 0; i < audioBytes.length; i++) {
+//         buffer[i] = audioBytes.charCodeAt(i);
+//       }
+
+//       const audioContext = new (window.AudioContext ||
+//         window.webkitAudioContext)();
+//       const audioBuffer = await audioContext.decodeAudioData(buffer.buffer);
+//       return audioBuffer;
+//     } catch (error) {
+//       console.error("Error converting audio:", error);
+//       return null;
+//     }
+//   };
+
+//   // Play audio with avatar lip-sync
+//   const playAudioWithLipSync = async (base64Audio, lipsyncData, text) => {
+//     if (!headRef.current) {
+//       // Fallback to regular audio if avatar not loaded
+//       const audioBytes = atob(base64Audio);
+//       const buffer = new Uint8Array(audioBytes.length);
+//       for (let i = 0; i < audioBytes.length; i++) {
+//         buffer[i] = audioBytes.charCodeAt(i);
+//       }
+//       const blob = new Blob([buffer], { type: "audio/mpeg" });
+//       const url = URL.createObjectURL(blob);
+//       const audio = new Audio(url);
+
+//       audio.addEventListener("ended", () => {
+//         URL.revokeObjectURL(url);
+//       });
+
+//       audio.play().catch(console.error);
+//       return;
+//     }
+
+//     try {
+//       const audioBuffer = await base64ToAudioBuffer(base64Audio);
+//       if (!audioBuffer) {
+//         throw new Error("Failed to decode audio");
+//       }
+
+//       // Use lip-sync data from backend if available
+//       let words, wtimes, wdurations;
+
+//       if (lipsyncData && lipsyncData.words) {
+//         words = lipsyncData.words;
+//         wtimes = lipsyncData.wtimes;
+//         wdurations = lipsyncData.wdurations;
+//       } else {
+//         // Fallback to basic estimation
+//         words = text.split(/\s+/).filter((word) => word.length > 0);
+//         const duration = audioBuffer.duration * 1000;
+//         wtimes = [];
+//         wdurations = [];
+//         let currentTime = 0;
+
+//         words.forEach((word, index) => {
+//           const wordDuration = Math.max(200, word.length * 50);
+//           wtimes.push(currentTime);
+//           wdurations.push(wordDuration);
+//           currentTime += wordDuration;
+//         });
+//       }
+
+//       // Use speakAudio method for lip-sync
+//       headRef.current.speakAudio({
+//         audio: audioBuffer,
+//         words: words,
+//         wtimes: wtimes,
+//         wdurations: wdurations,
+//       });
+//     } catch (error) {
+//       console.error("Error playing audio with lip-sync:", error);
+//       // Fallback to regular audio
+//       const audioBytes = atob(base64Audio);
+//       const buffer = new Uint8Array(audioBytes.length);
+//       for (let i = 0; i < audioBytes.length; i++) {
+//         buffer[i] = audioBytes.charCodeAt(i);
+//       }
+//       const blob = new Blob([buffer], { type: "audio/mpeg" });
+//       const url = URL.createObjectURL(blob);
+//       const audio = new Audio(url);
+
+//       audio.addEventListener("ended", () => {
+//         URL.revokeObjectURL(url);
+//       });
+
+//       audio.play().catch(console.error);
+//     }
+//   };
 
 //   const handleSendMessage = async () => {
-//     if (message.trim()) {
+//     if (message.trim() && !isLoading) {
 //       const userMessage = message.trim();
+//       setIsLoading(true);
 
 //       // Add user message to chat
 //       setMessages((prevMessages) => [
@@ -17,6 +257,10 @@
 //       ]);
 //       setMessage("");
 
+//       // Add loading message
+//       const loadingMessage = { text: "AI is typing...", type: "loading" };
+//       setMessages((prevMessages) => [...prevMessages, loadingMessage]);
+
 //       try {
 //         // Send message to your API
 //         const response = await fetch("http://robot.nick.ge:8000/chat/send", {
@@ -24,7 +268,10 @@
 //           headers: {
 //             "Content-Type": "application/json",
 //           },
-//           body: JSON.stringify({ message: userMessage }),
+//           body: JSON.stringify({
+//             message: userMessage,
+//             model: `${selectedAvatar}`,
+//           }),
 //         });
 
 //         const data = await response.json();
@@ -32,44 +279,32 @@
 //         // Extract response text
 //         const modelText = data.parts.map((p) => p.text).join("");
 
-//         // Add AI response to chat
-//         setMessages((prevMessages) => [
-//           ...prevMessages,
-//           { text: modelText, type: "ai" },
-//         ]);
+//         // Remove loading message and add AI response
+//         setMessages((prevMessages) =>
+//           prevMessages
+//             .filter((msg) => msg.type !== "loading")
+//             .concat([{ text: modelText, type: "ai" }])
+//         );
 
-//         // Play audio if available
-//         if (data.audio) {
-//           try {
-//             const audioBytes = atob(data.audio);
-//             const buffer = new Uint8Array(audioBytes.length);
-//             for (let i = 0; i < audioBytes.length; i++) {
-//               buffer[i] = audioBytes.charCodeAt(i);
-//             }
-//             const blob = new Blob([buffer], { type: "audio/mpeg" });
-//             const url = URL.createObjectURL(blob);
-//             const audio = new Audio(url);
-
-//             // Clean up the URL after audio finishes
-//             audio.addEventListener("ended", () => {
-//               URL.revokeObjectURL(url);
-//             });
-
-//             audio.play().catch(console.error);
-//           } catch (audioError) {
-//             console.error("Error playing audio:", audioError);
-//           }
+//         // Play audio with lip-sync if available
+//         if (data.audio && modelText) {
+//           await playAudioWithLipSync(data.audio, data.lipsync, modelText);
 //         }
 //       } catch (error) {
 //         console.error("Error sending message:", error);
-//         // Add error message to chat
-//         setMessages((prevMessages) => [
-//           ...prevMessages,
-//           {
-//             text: "Sorry, there was an error processing your message.",
-//             type: "ai",
-//           },
-//         ]);
+//         // Remove loading message and add error message
+//         setMessages((prevMessages) =>
+//           prevMessages
+//             .filter((msg) => msg.type !== "loading")
+//             .concat([
+//               {
+//                 text: "Sorry, there was an error processing your message.",
+//                 type: "ai",
+//               },
+//             ])
+//         );
+//       } finally {
+//         setIsLoading(false);
 //       }
 //     }
 //   };
@@ -81,7 +316,13 @@
 //     }
 //   };
 
-//   // Inline styles
+//   const handleBackToAvatars = () => {
+//     // Clear the selected avatar and go back to selection
+//     localStorage.removeItem("selectedAvatar");
+//     router.push("/avatars");
+//   };
+
+//   // Inline styles (keeping your existing styles)
 //   const containerStyle = {
 //     display: "flex",
 //     height: "100vh",
@@ -97,6 +338,48 @@
 //     flexDirection: "column",
 //     background:
 //       "linear-gradient(180deg, #000000 0%, rgba(17, 24, 39, 0.3) 50%, #000000 100%)",
+//   };
+
+//   const headerStyle = {
+//     padding: "20px 32px",
+//     borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+//     background: "rgba(0, 0, 0, 0.8)",
+//     backdropFilter: "blur(12px)",
+//     display: "flex",
+//     alignItems: "center",
+//     gap: "16px",
+//   };
+
+//   const backButtonStyle = {
+//     padding: "8px",
+//     background: "rgba(255, 255, 255, 0.05)",
+//     backdropFilter: "blur(8px)",
+//     border: "1px solid rgba(255, 255, 255, 0.1)",
+//     color: "rgba(255, 255, 255, 0.6)",
+//     borderRadius: "8px",
+//     cursor: "pointer",
+//     transition: "all 0.2s ease",
+//     display: "flex",
+//     alignItems: "center",
+//     justifyContent: "center",
+//   };
+
+//   const avatarInfoStyle = {
+//     display: "flex",
+//     alignItems: "center",
+//     gap: "12px",
+//   };
+
+//   const avatarThumbnailStyle = {
+//     width: "40px",
+//     height: "40px",
+//     borderRadius: "50%",
+//     background:
+//       "linear-gradient(135deg, rgba(0, 255, 209, 0.3), rgba(34, 211, 238, 0.3))",
+//     display: "flex",
+//     alignItems: "center",
+//     justifyContent: "center",
+//     border: "1px solid rgba(0, 255, 209, 0.2)",
 //   };
 
 //   const messagesContainerStyle = {
@@ -144,7 +427,6 @@
 //     gap: "16px",
 //   };
 
-//   // User message now on LEFT
 //   const userMessageContainerStyle = {
 //     display: "flex",
 //     justifyContent: "flex-start",
@@ -162,7 +444,6 @@
 //     boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
 //   };
 
-//   // AI message now on RIGHT
 //   const aiMessageContainerStyle = {
 //     display: "flex",
 //     justifyContent: "flex-end",
@@ -178,6 +459,13 @@
 //     borderTopRightRadius: "8px",
 //     padding: "16px 24px",
 //     boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+//   };
+
+//   const loadingMessageStyle = {
+//     ...aiMessageStyle,
+//     background:
+//       "linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 193, 7, 0.15))",
+//     border: "1px solid rgba(255, 193, 7, 0.25)",
 //   };
 
 //   const aiHeaderStyle = {
@@ -206,7 +494,6 @@
 //     borderRadius: "50%",
 //   };
 
-//   // Simplified input container
 //   const inputContainerStyle = {
 //     borderTop: "1px solid rgba(255, 255, 255, 0.1)",
 //     backgroundColor: "rgba(0, 0, 0, 0.8)",
@@ -222,7 +509,6 @@
 //     alignItems: "flex-end",
 //   };
 
-//   // Simple input field
 //   const inputFieldStyle = {
 //     flex: 1,
 //     backgroundColor: "rgba(255, 255, 255, 0.1)",
@@ -239,18 +525,17 @@
 //     transition: "all 0.2s ease",
 //   };
 
-//   // Simple send button
 //   const sendButtonStyle = {
 //     padding: "12px 16px",
 //     borderRadius: "12px",
 //     border: "none",
-//     cursor: message.trim() ? "pointer" : "not-allowed",
+//     cursor: message.trim() && !isLoading ? "pointer" : "not-allowed",
 //     transition: "all 0.2s ease",
 //     display: "flex",
 //     alignItems: "center",
 //     justifyContent: "center",
 //     minWidth: "50px",
-//     ...(message.trim()
+//     ...(message.trim() && !isLoading
 //       ? {
 //           background:
 //             "linear-gradient(135deg, rgba(6, 182, 212, 0.3), rgba(16, 185, 129, 0.3))",
@@ -284,6 +569,28 @@
 //     pointerEvents: "none",
 //   };
 
+//   const avatarContainerStyle = {
+//     width: "100%",
+//     height: "600px",
+//     position: "relative",
+//     zIndex: 10,
+//   };
+
+//   const statusTextStyle = {
+//     position: "absolute",
+//     bottom: "100px",
+//     left: "50%",
+//     transform: "translateX(-50%)",
+//     textAlign: "center",
+//     color: avatarLoaded
+//       ? "rgba(0, 255, 209, 0.6)"
+//       : avatarError
+//       ? "rgba(255, 0, 0, 0.6)"
+//       : "rgba(255, 255, 255, 0.5)",
+//     fontSize: "14px",
+//     fontWeight: "300",
+//   };
+
 //   const glowStyle1 = {
 //     position: "absolute",
 //     top: "25%",
@@ -309,46 +616,6 @@
 //     animationDelay: "2s",
 //   };
 
-//   const avatarMainStyle = {
-//     position: "relative",
-//     zIndex: 10,
-//     textAlign: "center",
-//   };
-
-//   const avatarCircleStyle = {
-//     width: "288px",
-//     height: "288px",
-//     margin: "0 auto 24px",
-//     borderRadius: "50%",
-//     display: "flex",
-//     alignItems: "center",
-//     justifyContent: "center",
-//     position: "relative",
-//   };
-
-//   const avatarGlowStyle = {
-//     position: "absolute",
-//     inset: 0,
-//     background:
-//       "linear-gradient(135deg, rgba(0, 255, 209, 0.3), rgba(111, 210, 192, 0.3))",
-//     borderRadius: "50%",
-//     filter: "blur(12px)",
-//   };
-
-//   const avatarInnerStyle = {
-//     position: "relative",
-//     width: "100%",
-//     height: "100%",
-//     background:
-//       "linear-gradient(135deg, rgba(0, 255, 209, 0.1), rgba(111, 210, 192, 0.1))",
-//     borderRadius: "50%",
-//     display: "flex",
-//     alignItems: "center",
-//     justifyContent: "center",
-//     backdropFilter: "blur(8px)",
-//     border: "1px solid rgba(0, 255, 209, 0.2)",
-//   };
-
 //   const bottomButtonsStyle = {
 //     position: "absolute",
 //     bottom: "32px",
@@ -368,6 +635,24 @@
 //     cursor: "pointer",
 //     transition: "all 0.2s ease",
 //   };
+
+//   if (!selectedAvatar) {
+//     return (
+//       <div style={containerStyle}>
+//         <div
+//           style={{
+//             display: "flex",
+//             alignItems: "center",
+//             justifyContent: "center",
+//             width: "100%",
+//             color: "rgba(255, 255, 255, 0.7)",
+//           }}
+//         >
+//           Loading...
+//         </div>
+//       </div>
+//     );
+//   }
 
 //   return (
 //     <>
@@ -410,11 +695,68 @@
 //         ::-webkit-scrollbar-thumb:hover {
 //           background: rgba(255, 255, 255, 0.3);
 //         }
+
+//         @keyframes typing {
+//           0%, 50%, 100% { opacity: 1; }
+//           25%, 75% { opacity: 0.5; }
+//         }
+
+//         .typing-indicator {
+//           animation: typing 1.5s infinite;
+//         }
 //       `}</style>
 
 //       <div style={containerStyle}>
 //         {/* Enhanced Chat Panel */}
 //         <div style={chatPanelStyle}>
+//           {/* Header with Avatar Info */}
+//           <div style={headerStyle}>
+//             <button
+//               onClick={handleBackToAvatars}
+//               style={backButtonStyle}
+//               title="Change Avatar"
+//               onMouseEnter={(e) => {
+//                 e.target.style.color = "white";
+//                 e.target.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+//                 e.target.style.borderColor = "rgba(0, 255, 209, 0.3)";
+//               }}
+//               onMouseLeave={(e) => {
+//                 e.target.style.color = "rgba(255, 255, 255, 0.6)";
+//                 e.target.style.backgroundColor = "rgba(255, 255, 255, 0.05)";
+//                 e.target.style.borderColor = "rgba(255, 255, 255, 0.1)";
+//               }}
+//             >
+//               <ArrowLeft size={20} />
+//             </button>
+
+//             <div style={avatarInfoStyle}>
+//               <div style={avatarThumbnailStyle}>
+//                 <User size={20} style={{ color: "rgba(0, 255, 209, 0.6)" }} />
+//               </div>
+//               <div>
+//                 <h3
+//                   style={{
+//                     color: "rgba(255, 255, 255, 0.9)",
+//                     margin: 0,
+//                     fontSize: "16px",
+//                     fontWeight: "600",
+//                   }}
+//                 >
+//                   {avatarName}
+//                 </h3>
+//                 <p
+//                   style={{
+//                     color: "rgba(255, 255, 255, 0.5)",
+//                     margin: 0,
+//                     fontSize: "12px",
+//                   }}
+//                 >
+//                   AI Assistant
+//                 </p>
+//               </div>
+//             </div>
+//           </div>
+
 //           {/* Messages */}
 //           <div style={messagesContainerStyle}>
 //             {messages.length === 0 ? (
@@ -438,7 +780,7 @@
 //                       margin: "0 0 12px 0",
 //                     }}
 //                   >
-//                     Welcome to AI Chat
+//                     Welcome to AI Avatar Chat
 //                   </h2>
 //                   <p
 //                     style={{
@@ -448,8 +790,8 @@
 //                       margin: 0,
 //                     }}
 //                   >
-//                     Start a conversation by typing your message below. I'm here
-//                     to help with anything you need.
+//                     Start a conversation with {avatarName} and watch them come
+//                     to life with lip-synchronized speech!
 //                   </p>
 //                 </div>
 //               </div>
@@ -491,6 +833,44 @@
 //                             >
 //                               Just now
 //                             </span>
+//                           </div>
+//                         </div>
+//                       </div>
+//                     ) : msg.type === "loading" ? (
+//                       // Loading message
+//                       <div style={aiMessageContainerStyle}>
+//                         <div style={{ maxWidth: "448px" }}>
+//                           <div style={loadingMessageStyle}>
+//                             <div style={aiHeaderStyle}>
+//                               <div style={aiAvatarStyle}>
+//                                 <div
+//                                   style={{
+//                                     ...aiIndicatorStyle,
+//                                     backgroundColor: "#FFC107",
+//                                   }}
+//                                 ></div>
+//                               </div>
+//                               <span
+//                                 style={{
+//                                   color: "#FFC107",
+//                                   fontSize: "14px",
+//                                   fontWeight: "600",
+//                                 }}
+//                               >
+//                                 {avatarName}
+//                               </span>
+//                             </div>
+//                             <p
+//                               style={{
+//                                 color: "rgba(255, 255, 255, 0.85)",
+//                                 fontSize: "16px",
+//                                 lineHeight: "1.5",
+//                                 margin: 0,
+//                               }}
+//                               className="typing-indicator"
+//                             >
+//                               {msg.text}
+//                             </p>
 //                           </div>
 //                         </div>
 //                       </div>
@@ -551,7 +931,7 @@
 //             )}
 //           </div>
 
-//           {/* Simplified Input Container */}
+//           {/* Input Container */}
 //           <div style={inputContainerStyle}>
 //             <div style={inputWrapperStyle}>
 //               <textarea
@@ -561,10 +941,11 @@
 //                 placeholder="Type your message..."
 //                 style={inputFieldStyle}
 //                 rows={1}
+//                 disabled={isLoading}
 //               />
 //               <button
 //                 onClick={handleSendMessage}
-//                 disabled={!message.trim()}
+//                 disabled={!message.trim() || isLoading}
 //                 style={sendButtonStyle}
 //                 title="Send message"
 //               >
@@ -577,47 +958,19 @@
 //         {/* Avatar Panel */}
 //         <div style={avatarPanelStyle}>
 //           <div style={avatarBackgroundStyle}></div>
-
 //           <div style={glowStyle1}></div>
 //           <div style={glowStyle2}></div>
 
-//           <div style={avatarMainStyle}>
-//             <div>
-//               <div style={avatarCircleStyle}>
-//                 <div style={avatarGlowStyle}></div>
-//                 <div style={avatarInnerStyle}>
-//                   <User
-//                     size={72}
-//                     style={{
-//                       color: "rgba(0, 255, 209, 0.6)",
-//                       strokeWidth: "1px",
-//                     }}
-//                   />
-//                 </div>
-//               </div>
-//             </div>
+//           {/* 3D Avatar Container */}
+//           <div ref={avatarRef} style={avatarContainerStyle}></div>
 
-//             <p
-//               style={{
-//                 color: "rgba(255, 255, 255, 0.5)",
-//                 fontSize: "16px",
-//                 fontWeight: "300",
-//                 margin: 0,
-//               }}
-//             >
-//               Avatar will appear here
-//             </p>
-//             <p
-//               style={{
-//                 color: "#4d4d4d",
-//                 fontSize: "14px",
-//                 marginTop: "8px",
-//                 fontWeight: "300",
-//                 margin: "8px 0 0 0",
-//               }}
-//             >
-//               Ready for 3D model integration
-//             </p>
+//           {/* Status Text */}
+//           <div style={statusTextStyle}>
+//             {avatarError
+//               ? avatarError
+//               : avatarLoaded
+//               ? "Avatar ready - speak to see lip sync!"
+//               : "Loading 3D avatar..."}
 //           </div>
 
 //           <div style={bottomButtonsStyle}>
@@ -677,7 +1030,17 @@
 // }
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { User, Send, Video, Mic, Settings } from "lucide-react";
+import {
+  User,
+  Send,
+  Video,
+  Mic,
+  Settings,
+  ArrowLeft,
+  Image,
+  Sparkles,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 
 // Extend Window interface for TalkingHead
 declare global {
@@ -691,13 +1054,37 @@ export default function AvatarChat() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [avatarLoaded, setAvatarLoaded] = useState(false);
   const [avatarError, setAvatarError] = useState(null);
+  const [selectedAvatar, setSelectedAvatar] = useState(null);
+  const [avatarName, setAvatarName] = useState("");
   const avatarRef = useRef(null);
   const headRef = useRef(null);
+  const router = useRouter();
+
+  // Get selected avatar from localStorage on mount
+  useEffect(() => {
+    const storedAvatar = localStorage.getItem("selectedAvatar");
+    if (storedAvatar) {
+      setSelectedAvatar(storedAvatar);
+      // Format avatar name for display
+      const name = storedAvatar
+        .replace(".glb", "")
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+      setAvatarName(name);
+    } else {
+      // If no avatar selected, redirect to avatar selection
+      router.push("/avatars");
+    }
+  }, [router]);
 
   // Load scripts and initialize avatar
   useEffect(() => {
+    if (!selectedAvatar) return;
+
     const initAvatar = async () => {
       try {
         // Check if TalkingHead is already loaded globally
@@ -755,32 +1142,41 @@ export default function AvatarChat() {
     };
 
     const initializeTalkingHead = async () => {
-      if (!avatarRef.current || !window.TalkingHead) return;
+      if (!avatarRef.current || !window.TalkingHead || !selectedAvatar) return;
 
-      // Create TalkingHead instance
-      const head = new window.TalkingHead(avatarRef.current, {
-        ttsEndpoint: "/gtts/",
-        ttsApikey: "dummy-key-not-used",
-        lipsyncModules: ["en"],
-        lipsyncLang: "en",
-        pcmSampleRate: 22050,
-        modelFPS: 120,
-        cameraView: "upper",
-        avatarMood: "neutral",
-      });
+      try {
+        // Create TalkingHead instance
+        const head = new window.TalkingHead(avatarRef.current, {
+          ttsEndpoint: "/gtts/",
+          ttsApikey: "dummy-key-not-used",
+          lipsyncModules: ["en"],
+          lipsyncLang: "en",
+          pcmSampleRate: 22050,
+          modelFPS: 120,
+          cameraView: "upper",
+          avatarMood: "neutral",
+        });
 
-      headRef.current = head;
+        headRef.current = head;
 
-      // Load the avatar
-      await head.showAvatar({
-        url: `http://robot.nick.ge:8000/avatar/get?f=woman-ginger.glb`,
-        body: "M",
-        avatarMood: "neutral",
-        lipsyncLang: "en",
-      });
+        // Load the selected avatar dynamically
+        await head.showAvatar({
+          url: `http://robot.nick.ge:8000/avatar/get?f=${selectedAvatar}`,
+          body:
+            selectedAvatar.toLowerCase().includes("woman") ||
+            selectedAvatar.toLowerCase().includes("girl")
+              ? "F"
+              : "M",
+          avatarMood: "neutral",
+          lipsyncLang: "en",
+        });
 
-      setAvatarLoaded(true);
-      console.log("Avatar loaded successfully");
+        setAvatarLoaded(true);
+        console.log(`Avatar loaded successfully: ${selectedAvatar}`);
+      } catch (error) {
+        console.error("Failed to initialize avatar:", error);
+        setAvatarError("Failed to load selected avatar. Please try again.");
+      }
     };
 
     initAvatar();
@@ -791,7 +1187,7 @@ export default function AvatarChat() {
         headRef.current = null;
       }
     };
-  }, []);
+  }, [selectedAvatar]);
 
   // Convert base64 audio to AudioBuffer for lip-sync
   const base64ToAudioBuffer = async (base64Audio) => {
@@ -889,6 +1285,74 @@ export default function AvatarChat() {
     }
   };
 
+  const handleGenerateImage = async () => {
+    if (!message.trim() || isGeneratingImage || isLoading) return;
+
+    const prompt = message.trim();
+    setIsGeneratingImage(true);
+
+    // Add user request to chat
+    setMessages((prevMessages) => [
+      ...prevMessages,
+      { text: `Generate image: ${prompt}`, type: "user" },
+    ]);
+    setMessage("");
+
+    // Add loading message for image generation
+    const loadingMessage = {
+      text: "Generating beautiful SVG image...",
+      type: "image-loading",
+    };
+    setMessages((prevMessages) => [...prevMessages, loadingMessage]);
+
+    try {
+      const response = await fetch("http://robot.nick.ge:8000/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: prompt,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.svg) {
+        // Remove loading message and add generated image
+        setMessages((prevMessages) =>
+          prevMessages
+            .filter((msg) => msg.type !== "image-loading")
+            .concat([
+              {
+                text: `Here's your generated image for: "${prompt}"`,
+                type: "ai-image",
+                svg: data.svg,
+                prompt: prompt,
+              },
+            ])
+        );
+      } else {
+        throw new Error("No SVG data received");
+      }
+    } catch (error) {
+      console.error("Error generating image:", error);
+      // Remove loading message and add error message
+      setMessages((prevMessages) =>
+        prevMessages
+          .filter((msg) => msg.type !== "image-loading")
+          .concat([
+            {
+              text: "Sorry, there was an error generating the image. Please try again.",
+              type: "ai",
+            },
+          ])
+      );
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (message.trim() && !isLoading) {
       const userMessage = message.trim();
@@ -912,7 +1376,10 @@ export default function AvatarChat() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ message: userMessage }),
+          body: JSON.stringify({
+            message: userMessage,
+            model: `${selectedAvatar}`,
+          }),
         });
 
         const data = await response.json();
@@ -957,6 +1424,12 @@ export default function AvatarChat() {
     }
   };
 
+  const handleBackToAvatars = () => {
+    // Clear the selected avatar and go back to selection
+    localStorage.removeItem("selectedAvatar");
+    router.push("/avatars");
+  };
+
   // Inline styles (keeping your existing styles)
   const containerStyle = {
     display: "flex",
@@ -973,6 +1446,48 @@ export default function AvatarChat() {
     flexDirection: "column",
     background:
       "linear-gradient(180deg, #000000 0%, rgba(17, 24, 39, 0.3) 50%, #000000 100%)",
+  };
+
+  const headerStyle = {
+    padding: "20px 32px",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+    background: "rgba(0, 0, 0, 0.8)",
+    backdropFilter: "blur(12px)",
+    display: "flex",
+    alignItems: "center",
+    gap: "16px",
+  };
+
+  const backButtonStyle = {
+    padding: "8px",
+    background: "rgba(255, 255, 255, 0.05)",
+    backdropFilter: "blur(8px)",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
+    color: "rgba(255, 255, 255, 0.6)",
+    borderRadius: "8px",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  };
+
+  const avatarInfoStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+  };
+
+  const avatarThumbnailStyle = {
+    width: "40px",
+    height: "40px",
+    borderRadius: "50%",
+    background:
+      "linear-gradient(135deg, rgba(0, 255, 209, 0.3), rgba(34, 211, 238, 0.3))",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: "1px solid rgba(0, 255, 209, 0.2)",
   };
 
   const messagesContainerStyle = {
@@ -1054,11 +1569,30 @@ export default function AvatarChat() {
     boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
   };
 
+  const aiImageMessageStyle = {
+    maxWidth: "500px",
+    background:
+      "linear-gradient(135deg, rgba(147, 51, 234, 0.2), rgba(168, 85, 247, 0.15))",
+    backdropFilter: "blur(8px)",
+    border: "1px solid rgba(147, 51, 234, 0.25)",
+    borderRadius: "24px",
+    borderTopRightRadius: "8px",
+    padding: "20px",
+    boxShadow: "0 25px 50px -12px rgba(147, 51, 234, 0.25)",
+  };
+
   const loadingMessageStyle = {
     ...aiMessageStyle,
     background:
       "linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 193, 7, 0.15))",
     border: "1px solid rgba(255, 193, 7, 0.25)",
+  };
+
+  const imageLoadingMessageStyle = {
+    ...aiImageMessageStyle,
+    background:
+      "linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(168, 85, 247, 0.15))",
+    border: "1px solid rgba(168, 85, 247, 0.25)",
   };
 
   const aiHeaderStyle = {
@@ -1080,6 +1614,18 @@ export default function AvatarChat() {
     border: "1px solid rgba(6, 182, 212, 0.2)",
   };
 
+  const aiImageAvatarStyle = {
+    width: "28px",
+    height: "28px",
+    borderRadius: "50%",
+    background:
+      "linear-gradient(135deg, rgba(147, 51, 234, 0.3), rgba(168, 85, 247, 0.3))",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: "1px solid rgba(147, 51, 234, 0.2)",
+  };
+
   const aiIndicatorStyle = {
     width: "10px",
     height: "10px",
@@ -1087,6 +1633,20 @@ export default function AvatarChat() {
     borderRadius: "50%",
   };
 
+  const svgContainerStyle = {
+    marginTop: "16px",
+    borderRadius: "16px",
+    overflow: "hidden",
+    background: "rgba(255, 255, 255, 0.02)",
+    border: "1px solid rgba(255, 255, 255, 0.05)",
+    padding: "16px",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: "200px",
+    maxHeight: "400px",
+    width: "100%",
+  };
   const inputContainerStyle = {
     borderTop: "1px solid rgba(255, 255, 255, 0.1)",
     backgroundColor: "rgba(0, 0, 0, 0.8)",
@@ -1135,6 +1695,34 @@ export default function AvatarChat() {
           color: "#67E8F9",
           border: "1px solid rgba(6, 182, 212, 0.4)",
           boxShadow: "0 4px 16px rgba(6, 182, 212, 0.25)",
+        }
+      : {
+          color: "rgba(255, 255, 255, 0.4)",
+          background: "rgba(255, 255, 255, 0.05)",
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+        }),
+  };
+
+  const imageButtonStyle = {
+    padding: "12px 16px",
+    borderRadius: "12px",
+    border: "none",
+    cursor:
+      message.trim() && !isGeneratingImage && !isLoading
+        ? "pointer"
+        : "not-allowed",
+    transition: "all 0.2s ease",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: "50px",
+    ...(message.trim() && !isGeneratingImage && !isLoading
+      ? {
+          background:
+            "linear-gradient(135deg, rgba(147, 51, 234, 0.3), rgba(168, 85, 247, 0.3))",
+          color: "#A855F7",
+          border: "1px solid rgba(147, 51, 234, 0.4)",
+          boxShadow: "0 4px 16px rgba(147, 51, 234, 0.25)",
         }
       : {
           color: "rgba(255, 255, 255, 0.4)",
@@ -1229,12 +1817,35 @@ export default function AvatarChat() {
     transition: "all 0.2s ease",
   };
 
+  if (!selectedAvatar) {
+    return (
+      <div style={containerStyle}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            color: "rgba(255, 255, 255, 0.7)",
+          }}
+        >
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.5; }
+        }
+
+        @keyframes sparkle {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.7; transform: scale(1.1); }
         }
 
         button:hover {
@@ -1279,11 +1890,76 @@ export default function AvatarChat() {
         .typing-indicator {
           animation: typing 1.5s infinite;
         }
+
+        .sparkle-animation {
+          animation: sparkle 2s infinite ease-in-out;
+        }
+
+        .svg-content {
+          max-width: 100%;
+          height: auto;
+          filter: drop-shadow(0 4px 20px rgba(147, 51, 234, 0.3));
+        }
+
+       .svg-content svg {
+         max-width: 100%;
+         max-height: 350px;
+         height: auto;
+         width: auto;
+        }
       `}</style>
 
       <div style={containerStyle}>
         {/* Enhanced Chat Panel */}
         <div style={chatPanelStyle}>
+          {/* Header with Avatar Info */}
+          <div style={headerStyle}>
+            <button
+              onClick={handleBackToAvatars}
+              style={backButtonStyle}
+              title="Change Avatar"
+              onMouseEnter={(e) => {
+                e.target.style.color = "white";
+                e.target.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+                e.target.style.borderColor = "rgba(0, 255, 209, 0.3)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.color = "rgba(255, 255, 255, 0.6)";
+                e.target.style.backgroundColor = "rgba(255, 255, 255, 0.05)";
+                e.target.style.borderColor = "rgba(255, 255, 255, 0.1)";
+              }}
+            >
+              <ArrowLeft size={20} />
+            </button>
+
+            <div style={avatarInfoStyle}>
+              <div style={avatarThumbnailStyle}>
+                <User size={20} style={{ color: "rgba(0, 255, 209, 0.6)" }} />
+              </div>
+              <div>
+                <h3
+                  style={{
+                    color: "rgba(255, 255, 255, 0.9)",
+                    margin: 0,
+                    fontSize: "16px",
+                    fontWeight: "600",
+                  }}
+                >
+                  {avatarName}
+                </h3>
+                <p
+                  style={{
+                    color: "rgba(255, 255, 255, 0.5)",
+                    margin: 0,
+                    fontSize: "12px",
+                  }}
+                >
+                  AI Assistant
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Messages */}
           <div style={messagesContainerStyle}>
             {messages.length === 0 ? (
@@ -1317,8 +1993,9 @@ export default function AvatarChat() {
                       margin: 0,
                     }}
                   >
-                    Start a conversation and watch the avatar come to life with
-                    lip-synchronized speech!
+                    Start a conversation with {avatarName} and watch them come
+                    to life with lip-synchronized speech! You can also generate
+                    beautiful SVG images.
                   </p>
                 </div>
               </div>
@@ -1384,7 +2061,7 @@ export default function AvatarChat() {
                                   fontWeight: "600",
                                 }}
                               >
-                                AI Assistant
+                                {avatarName}
                               </span>
                             </div>
                             <p
@@ -1398,6 +2075,115 @@ export default function AvatarChat() {
                             >
                               {msg.text}
                             </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : msg.type === "image-loading" ? (
+                      // Image loading message
+                      <div style={aiMessageContainerStyle}>
+                        <div style={{ maxWidth: "500px" }}>
+                          <div style={imageLoadingMessageStyle}>
+                            <div style={aiHeaderStyle}>
+                              <div style={aiImageAvatarStyle}>
+                                <Sparkles
+                                  size={14}
+                                  style={{
+                                    color: "#A855F7",
+                                  }}
+                                  className="sparkle-animation"
+                                />
+                              </div>
+                              <span
+                                style={{
+                                  color: "#A855F7",
+                                  fontSize: "14px",
+                                  fontWeight: "600",
+                                }}
+                              >
+                                AI Artist
+                              </span>
+                            </div>
+                            <p
+                              style={{
+                                color: "rgba(255, 255, 255, 0.85)",
+                                fontSize: "16px",
+                                lineHeight: "1.5",
+                                margin: 0,
+                              }}
+                              className="typing-indicator"
+                            >
+                              {msg.text}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : msg.type === "ai-image" ? (
+                      // AI image message on RIGHT
+                      <div style={aiMessageContainerStyle}>
+                        <div style={{ maxWidth: "500px" }}>
+                          <div style={aiImageMessageStyle}>
+                            <div style={aiHeaderStyle}>
+                              <div style={aiImageAvatarStyle}>
+                                <Image
+                                  size={14}
+                                  style={{
+                                    color: "#A855F7",
+                                  }}
+                                />
+                              </div>
+                              <span
+                                style={{
+                                  color: "#A855F7",
+                                  fontSize: "14px",
+                                  fontWeight: "600",
+                                }}
+                              >
+                                AI Artist
+                              </span>
+                            </div>
+                            <p
+                              style={{
+                                color: "rgba(255, 255, 255, 0.85)",
+                                fontSize: "16px",
+                                lineHeight: "1.5",
+                                margin: 0,
+                              }}
+                            >
+                              {msg.text}
+                            </p>
+                            {msg.svg && (
+                              <div style={svgContainerStyle}>
+                                <div
+                                  dangerouslySetInnerHTML={{ __html: msg.svg }}
+                                  className="svg-content"
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "flex-end",
+                              marginTop: "8px",
+                              gap: "8px",
+                            }}
+                          >
+                            <span
+                              style={{
+                                color: "rgba(255, 255, 255, 0.3)",
+                                fontSize: "12px",
+                              }}
+                            >
+                              Just now
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -1465,11 +2251,19 @@ export default function AvatarChat() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Type your message..."
+                placeholder="Type your message or image prompt..."
                 style={inputFieldStyle}
                 rows={1}
-                disabled={isLoading}
+                disabled={isLoading || isGeneratingImage}
               />
+              <button
+                onClick={handleGenerateImage}
+                disabled={!message.trim() || isGeneratingImage || isLoading}
+                style={imageButtonStyle}
+                title="Generate SVG Image"
+              >
+                <Sparkles size={20} style={{ strokeWidth: "1.5px" }} />
+              </button>
               <button
                 onClick={handleSendMessage}
                 disabled={!message.trim() || isLoading}
