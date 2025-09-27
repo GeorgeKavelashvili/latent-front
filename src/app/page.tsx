@@ -111,7 +111,7 @@ const LatentLandingComplete: React.FC = () => {
         {/* Fixed Navigation */}
         <nav className="dark-header">
           <div className="dark-logo">
-            <span className="logo-text">LATENT</span>
+            <span className="logo-text">adapt</span>
           </div>
           <div className="dark-nav">
             <a href="#features" className="dark-nav-link">
@@ -139,7 +139,7 @@ const LatentLandingComplete: React.FC = () => {
               </h1>
               <p className="hero-description">
                 Experience next-generation AI avatars that don't just talk—they
-                understand, feel, and evolve with you. Welcome to LATENT, where
+                understand, feel, and evolve with you. Welcome to adapt, where
                 artificial intelligence meets authentic connection.
               </p>
               <div className="hero-buttons">

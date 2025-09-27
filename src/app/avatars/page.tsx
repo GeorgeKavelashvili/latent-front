@@ -487,7 +487,7 @@ export default function AvatarsPage() {
                     </div>
                     <div style={avatarInfoStyle}>
                       <h3 style={avatarNameStyle}>{avatar.name}</h3>
-                      <p style={avatarTypeStyle}>AI Assistant</p>
+                      <p style={avatarTypeStyle}>{avatar.role}</p>
                     </div>
                   </div>
                 </div>
